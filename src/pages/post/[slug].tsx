@@ -1,4 +1,6 @@
 import { GetStaticPaths, GetStaticProps } from 'next';
+import { RichText } from 'prismic-dom';
+import { FiCalendar,FiClock, FiUser } from "react-icons/fi";
 
 import { getPrismicClient } from '../../services/prismic';
 
@@ -26,20 +28,100 @@ interface PostProps {
   post: Post;
 }
 
-// export default function Post() {
-//   // TODO
-// }
+export default function Post({post} : PostProps) {
 
-// export const getStaticPaths = async () => {
-//   const prismic = getPrismicClient();
-//   const posts = await prismic.query(TODO);
+  const totalWords = post.data.content.reduce((total, contentItem) => {
+    total += contentItem.heading.split(' ').length;
 
-//   // TODO
-// };
+    const words = contentItem.body.map(item => item.text.split(' ').length);
+    words.map(word => (total += word));
+    return total;
+  }, 0);
 
-// export const getStaticProps = async context => {
-//   const prismic = getPrismicClient();
-//   const response = await prismic.getByUID(TODO);
+  const time = Math.ceil(totalWords/200);
 
-//   // TODO
-// };
+
+  return(
+    <div className={styles.screen}>
+      <div className={styles.container}>
+
+        <div className={styles.logo}>
+          <img src="/logo.svg" alt="logo" /> 
+        </div>
+
+
+      </div>
+
+      <div className={styles.banner}>
+        <img src={`${post.data.banner.url}`} alt="logo" />     
+      </div>
+
+      <div className={styles.post}>
+        <h1>{post.data.title}</h1>
+        <span><FiCalendar /> {post.first_publication_date}</span>
+        <span><FiUser /> {post.data.author}</span>
+        <span><FiClock /> {time} min</span>
+
+        {post.data.content.map(content => {
+          return (
+            <article key={content.heading}>
+              <h2>{content.heading}</h2>
+              <div className={styles.postBody}
+                dangerouslySetInnerHTML={{
+                  __html: RichText.asHtml(content.body),
+                }}
+              >
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      <footer className={styles.foot}>
+
+      </footer>
+
+    </div>
+
+)
+}
+
+export const getStaticPaths = async () => {
+  return {
+    paths: [],
+    fallback: 'blocking'
+  }
+};
+
+export const getStaticProps : GetStaticProps= async ({ params }) => {
+  const {slug} = params;
+  const prismic = getPrismicClient();
+  const response = await prismic.getByUID('posts', String(slug), {});
+  console.log(JSON.stringify(response, null, 2))
+
+  const post = {
+    first_publication_date: new Date(response.first_publication_date).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    }),
+    data: {
+      title: response.data.title,
+      banner: {
+        url: response.data.banner.url,
+      },
+      author: response.data.author,
+      content: response.data.content.map(content => {
+        return {
+          heading: content.heading,
+          body: [...content.body],
+        }
+      })
+    }
+  }
+  return {
+    props: {
+      post
+    }
+  }
+};
